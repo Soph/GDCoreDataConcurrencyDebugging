@@ -132,7 +132,12 @@ static BOOL ValidateConcurrencyForObjectWithExpectedIdentifier(id object, void *
     NSManagedObjectContextConcurrencyType concurrencyType = (NSManagedObjectContextConcurrencyType)objc_getAssociatedObject(object, ConcurrencyTypeKey);
     if (concurrencyType == NSConfinementConcurrencyType) {
 #endif
+      if (([NSOperationQueue mainQueue] != [NSOperationQueue currentQueue]) && ([[NSOperationQueue currentQueue] maxConcurrentOperationCount] == 1)) {
+        return [NSOperationQueue currentQueue] == expectedConcurrencyIdentifier;
+      }
+      else {
         return pthread_self() == expectedConcurrencyIdentifier;
+      }
 #ifdef COREDATA_CONCURRENCY_AVAILABLE
     } else if (concurrencyType == NSMainQueueConcurrencyType && [NSThread isMainThread]) {
         return YES;
@@ -157,9 +162,14 @@ static void SetConcurrencyIdentifierForContext(NSManagedObjectContext *context)
     
 #ifdef COREDATA_CONCURRENCY_AVAILABLE
     if (context.concurrencyType == NSConfinementConcurrencyType) {
+      if (([NSOperationQueue mainQueue] != [NSOperationQueue currentQueue]) && ([[NSOperationQueue currentQueue] maxConcurrentOperationCount] == 1)) {
+        concurrencyIdentifier = [NSOperationQueue currentQueue];
+      }
+      else {
 #endif
         concurrencyIdentifier = pthread_self();
 #ifdef COREDATA_CONCURRENCY_AVAILABLE
+      }
     } else if (context.concurrencyType == NSMainQueueConcurrencyType
                || context.concurrencyType == NSPrivateQueueConcurrencyType) {
         __block dispatch_queue_t confinementQueue = NULL;
